@@ -41,7 +41,38 @@ jobs:
           tar -czvf nilbbs-macos-amd64.tar.gz nilbbs-macos
           zip nilbbs-windows-amd64.zip nilbbs.exe
           tar -czvf nilbbs-linux-arm64.tar.gz nilbbs-arm64
-            
+      
+      - name: 设置Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: 登录到Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+      
+      - name: 提取版本信息
+        id: get_version
+        run: |
+          # 如果是标签推送，则使用标签作为版本
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            # 如果是手动触发，使用latest作为版本
+            VERSION=latest
+          fi
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          echo "构建版本: ${VERSION}"
+      
+      - name: 构建并推送Docker镜像
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest
+      
       - name: 发布到GitHub Releases
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
