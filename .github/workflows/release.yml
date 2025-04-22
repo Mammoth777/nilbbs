@@ -1,0 +1,66 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - main  # 当推送到main分支时也触发
+  workflow_dispatch:  # 允许手动触发工作流
+
+jobs:
+  build:
+    name: 构建和发布
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        
+      - name: 设置Go环境
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'  # 请根据您的项目需求调整Go版本
+          
+      - name: 获取依赖
+        run: go mod download
+        
+      - name: 构建所有平台
+        run: make build-all
+        
+      - name: 打包发布文件
+        run: |
+          mkdir -p release
+          cp nilbbs-linux release/
+          cp nilbbs-macos release/
+          cp nilbbs.exe release/
+          cp nilbbs-arm64 release/
+          cd release
+          tar -czvf nilbbs-linux-amd64.tar.gz nilbbs-linux
+          tar -czvf nilbbs-macos-amd64.tar.gz nilbbs-macos
+          zip nilbbs-windows-amd64.zip nilbbs.exe
+          tar -czvf nilbbs-linux-arm64.tar.gz nilbbs-arm64
+            
+      - name: 发布到GitHub Releases
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            release/nilbbs-linux-amd64.tar.gz
+            release/nilbbs-macos-amd64.tar.gz
+            release/nilbbs-windows-amd64.zip
+            release/nilbbs-linux-arm64.tar.gz
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: 上传构建产物（非标签推送）
+        uses: actions/upload-artifact@v3
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        with:
+          name: nilbbs-builds
+          path: |
+            release/nilbbs-linux-amd64.tar.gz
+            release/nilbbs-macos-amd64.tar.gz
+            release/nilbbs-windows-amd64.zip
+            release/nilbbs-linux-arm64.tar.gz

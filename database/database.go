@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -35,18 +36,9 @@ func InitDB() error {
 	DB = db
 	log.Println("成功连接到SQLite数据库")
 
-	// 删除旧的帖子表
-	_, err = DB.Exec(`DROP TABLE IF EXISTS comments`)
-	if err != nil {
-		return err
-	}
+	// 不再删除表，只在表不存在时创建它们
 
-	_, err = DB.Exec(`DROP TABLE IF EXISTS posts`)
-	if err != nil {
-		return err
-	}
-
-	// 创建新的帖子表 - 不包含标题字段
+	// 创建帖子表 - 不包含标题字段
 	_, err = DB.Exec(`
 	CREATE TABLE IF NOT EXISTS posts (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -81,4 +73,79 @@ func CloseDB() {
 	if DB != nil {
 		DB.Close()
 	}
+}
+
+// 删除N天不活跃的帖子(创建超过N天且N天没有新评论的帖子)
+func DeleteOldPosts(days int) (int64, error) {
+	// 计算截止日期
+	cutoffDate := time.Now().AddDate(0, 0, -days)
+	
+	// 开始事务
+	tx, err := DB.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	// 查找不活跃的帖子ID：
+	// 1. 帖子创建时间超过N天
+	// 2. 且没有N天内的评论
+	rows, err := tx.Query(`
+		SELECT p.id FROM posts p 
+		WHERE p.created_at < ? 
+		AND NOT EXISTS (
+			SELECT 1 FROM comments c 
+			WHERE c.post_id = p.id AND c.created_at >= ?
+		)`, cutoffDate, cutoffDate)
+	
+	if err != nil {
+		return 0, err
+	}
+	
+	var inactivePostIDs []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		inactivePostIDs = append(inactivePostIDs, id)
+	}
+	rows.Close()
+	
+	if len(inactivePostIDs) == 0 {
+		// 没有不活跃的帖子需要删除
+		tx.Commit()
+		return 0, nil
+	}
+	
+	// 为SQL IN语句准备参数占位符
+	placeholders := "?"
+	args := make([]interface{}, len(inactivePostIDs))
+	args[0] = inactivePostIDs[0]
+	
+	for i := 1; i < len(inactivePostIDs); i++ {
+		placeholders += ",?"
+		args[i] = inactivePostIDs[i]
+	}
+	
+	// 删除这些不活跃帖子的评论
+	_, err = tx.Exec("DELETE FROM comments WHERE post_id IN ("+placeholders+")", args...)
+	if err != nil {
+		return 0, err
+	}
+	
+	// 删除不活跃的帖子
+	result, err := tx.Exec("DELETE FROM posts WHERE id IN ("+placeholders+")", args...)
+	if err != nil {
+		return 0, err
+	}
+	
+	// 提交事务
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	
+	// 返回删除的帖子数量
+	return result.RowsAffected()
 }
