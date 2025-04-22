@@ -6,6 +6,9 @@ on:
       - 'v*'  # 仅在推送标签时触发
   workflow_dispatch:  # 允许手动触发工作流
 
+permissions:
+  contents: write  # 这允许工作流写入仓库内容，包括创建发布
+
 jobs:
   build:
     name: 构建和发布
