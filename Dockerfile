@@ -1,6 +1,12 @@
 # 使用多阶段构建减小最终镜像大小
 # 第一阶段：构建应用
-FROM golang:1.23-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS builder
+
+# 添加构建参数，用于跨平台构建
+ARG BUILDPLATFORM
+ARG TARGETPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
 
 WORKDIR /app
 
@@ -11,11 +17,11 @@ RUN go mod download
 # 复制源代码
 COPY . .
 
-# 构建应用
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o nilbbs main.go
+# 构建应用，根据目标架构编译
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o nilbbs main.go
 
 # 第二阶段：运行应用
-FROM alpine:latest
+FROM --platform=$TARGETPLATFORM alpine:latest
 
 WORKDIR /app
 

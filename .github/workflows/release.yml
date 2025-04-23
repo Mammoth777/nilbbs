@@ -70,6 +70,7 @@ jobs:
         with:
           context: .
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: |
             ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}
             ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest
