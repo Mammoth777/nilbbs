@@ -49,32 +49,58 @@ jobs:
           CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o nilbbs-macos main.go
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o nilbbs.exe main.go
 
+      - name: 将构建制品保存到releases目录
+        run: |
+          mkdir -p releases
+          cp nilbbs-linux-amd64 releases/nilbbs-linux
+          cp nilbbs-linux-arm64 releases/nilbbs-arm64
+          cp nilbbs-macos releases/nilbbs-macos
+          cp nilbbs.exe releases/nilbbs.exe
+
       - name: 打包发布文件
         run: |
           mkdir -p release
-          cp nilbbs-linux-amd64 release/nilbbs-linux
-          cp nilbbs-linux-arm64 release/nilbbs-arm64
-          cp nilbbs-macos release/
-          cp nilbbs.exe release/
+          cp releases/nilbbs-linux release/nilbbs-linux
+          cp releases/nilbbs-arm64 release/nilbbs-arm64
+          cp releases/nilbbs-macos release/
+          cp releases/nilbbs.exe release/
           cd release
           tar -czvf nilbbs-linux-amd64.tar.gz nilbbs-linux
           tar -czvf nilbbs-macos-amd64.tar.gz nilbbs-macos
           zip nilbbs-windows-amd64.zip nilbbs.exe
           tar -czvf nilbbs-linux-arm64.tar.gz nilbbs-arm64
           cd ..
-          
-          # 准备Docker构建所需文件
-          # Linux/amd64
-          mkdir -p docker-linux-amd64
-          cp -r static templates docker-linux-amd64/
-          cp nilbbs-linux-amd64 docker-linux-amd64/nilbbs
-          cp Dockerfile docker-linux-amd64/
-          
-          # Linux/arm64
-          mkdir -p docker-linux-arm64
-          cp -r static templates docker-linux-arm64/
-          cp nilbbs-linux-arm64 docker-linux-arm64/nilbbs
-          cp Dockerfile docker-linux-arm64/
+      
+      - name: 创建新的Dockerfile
+        run: |
+          # 创建一个新的Dockerfile，用于直接使用预构建的二进制文件
+          cat > Dockerfile.multi-arch << 'EOF'
+          # 多架构Dockerfile
+          FROM alpine:latest
+
+          # 设置工作目录
+          WORKDIR /app
+
+          # 安装运行时依赖
+          RUN apk --no-cache add ca-certificates tzdata sqlite
+
+          # 设置时区为亚洲/上海
+          ENV TZ=Asia/Shanghai
+
+          # 复制二进制文件和资源
+          COPY nilbbs /app/
+          COPY static /app/static
+          COPY templates /app/templates
+
+          # 确保数据目录存在
+          RUN mkdir -p /app/data
+
+          # 暴露应用端口
+          EXPOSE 8080
+
+          # 运行应用
+          CMD ["./nilbbs"]
+          EOF
       
       - name: 设置Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -97,6 +123,20 @@ jobs:
           fi
           echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
           echo "构建版本: ${VERSION}"
+          
+      - name: 准备Docker构建目录
+        run: |
+          # 准备AMD64构建目录
+          mkdir -p docker-linux-amd64
+          cp -r static templates docker-linux-amd64/
+          cp releases/nilbbs-linux docker-linux-amd64/nilbbs
+          cp Dockerfile.multi-arch docker-linux-amd64/Dockerfile
+          
+          # 准备ARM64构建目录
+          mkdir -p docker-linux-arm64
+          cp -r static templates docker-linux-arm64/
+          cp releases/nilbbs-arm64 docker-linux-arm64/nilbbs
+          cp Dockerfile.multi-arch docker-linux-arm64/Dockerfile
       
       - name: 设置 Docker
         run: |
