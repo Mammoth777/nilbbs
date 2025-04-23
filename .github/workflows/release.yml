@@ -33,6 +33,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc libc6-dev sqlite3 libsqlite3-dev
+          # 安装ARM64交叉编译工具
+          sudo apt-get install -y gcc-aarch64-linux-gnu
       
       - name: 构建Linux/amd64（启用CGO）
         run: |
