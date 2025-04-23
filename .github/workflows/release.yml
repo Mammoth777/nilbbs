@@ -139,7 +139,7 @@ jobs:
           docker manifest push ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}
           
           echo "正在创建latest标签清单..."
-          docker manifest create ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest \
+          docker manifest create --amend ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest \
             ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:amd64-${{ steps.get_version.outputs.VERSION }} \
             ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:arm64-${{ steps.get_version.outputs.VERSION }}
             
