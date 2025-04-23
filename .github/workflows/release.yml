@@ -103,7 +103,7 @@ jobs:
           push: true
           platforms: linux/amd64
           tags: |
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}-amd64
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:amd64-${{ steps.get_version.outputs.VERSION }}
           file: ./Dockerfile
           
       - name: 构建并推送Docker镜像 (ARM64)
@@ -113,33 +113,37 @@ jobs:
           push: true
           platforms: linux/arm64
           tags: |
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}-arm64
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:arm64-${{ steps.get_version.outputs.VERSION }}
           file: ./Dockerfile
           
       - name: 创建并推送多平台清单
         run: |
+          # 确保使用 docker CLI 的实验特性
+          export DOCKER_CLI_EXPERIMENTAL=enabled
+          
           # 创建并推送多平台清单
           docker manifest create ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }} \
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}-amd64 \
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}-arm64
-            
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:amd64-${{ steps.get_version.outputs.VERSION }} \
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:arm64-${{ steps.get_version.outputs.VERSION }}
+          
+          # 创建 latest 标签
           docker manifest create ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest \
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}-amd64 \
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}-arm64
-            
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:amd64-${{ steps.get_version.outputs.VERSION }} \
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:arm64-${{ steps.get_version.outputs.VERSION }}
+          
           # 将平台标注添加到清单
           docker manifest annotate ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }} \
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}-amd64 --os linux --arch amd64
-            
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:amd64-${{ steps.get_version.outputs.VERSION }} --os linux --arch amd64
+          
           docker manifest annotate ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }} \
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}-arm64 --os linux --arch arm64
-            
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:arm64-${{ steps.get_version.outputs.VERSION }} --os linux --arch arm64
+          
           docker manifest annotate ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest \
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}-amd64 --os linux --arch amd64
-            
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:amd64-${{ steps.get_version.outputs.VERSION }} --os linux --arch amd64
+          
           docker manifest annotate ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest \
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}-arm64 --os linux --arch arm64
-            
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:arm64-${{ steps.get_version.outputs.VERSION }} --os linux --arch arm64
+          
           # 推送清单
           docker manifest push ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}
           docker manifest push ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest
