@@ -96,56 +96,58 @@ jobs:
           echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
           echo "构建版本: ${VERSION}"
       
-      - name: 构建并推送Docker镜像 (AMD64)
-        uses: docker/build-push-action@v5
-        with:
-          context: ./docker-linux-amd64
-          push: true
-          platforms: linux/amd64
-          tags: |
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:amd64-${{ steps.get_version.outputs.VERSION }}
-          file: ./Dockerfile
+      - name: 设置 Docker
+        run: |
+          # 启用Docker实验特性
+          echo '{"experimental": true}' | sudo tee /etc/docker/daemon.json
+          sudo systemctl restart docker
+          docker version
           
-      - name: 构建并推送Docker镜像 (ARM64)
-        uses: docker/build-push-action@v5
-        with:
-          context: ./docker-linux-arm64
-          push: true
-          platforms: linux/arm64
-          tags: |
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:arm64-${{ steps.get_version.outputs.VERSION }}
-          file: ./Dockerfile
+      - name: 构建Docker镜像 (AMD64)
+        run: |
+          cd docker-linux-amd64
+          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:amd64-${{ steps.get_version.outputs.VERSION }} .
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:amd64-${{ steps.get_version.outputs.VERSION }}
+          cd ..
+          
+      - name: 构建Docker镜像 (ARM64)
+        run: |
+          cd docker-linux-arm64
+          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:arm64-${{ steps.get_version.outputs.VERSION }} .
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:arm64-${{ steps.get_version.outputs.VERSION }}
+          cd ..
           
       - name: 创建并推送多平台清单
         run: |
-          # 确保使用 docker CLI 的实验特性
+          # 确保使用Docker CLI的实验特性
           export DOCKER_CLI_EXPERIMENTAL=enabled
           
-          # 创建并推送多平台清单
+          echo "正在创建版本标签清单..."
           docker manifest create ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }} \
             ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:amd64-${{ steps.get_version.outputs.VERSION }} \
             ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:arm64-${{ steps.get_version.outputs.VERSION }}
+            
+          echo "为版本标签添加平台标注..."
+          docker manifest annotate ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }} \
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:amd64-${{ steps.get_version.outputs.VERSION }} --os linux --arch amd64
+          docker manifest annotate ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }} \
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:arm64-${{ steps.get_version.outputs.VERSION }} --os linux --arch arm64
+            
+          echo "推送版本标签清单..."
+          docker manifest push ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}
           
-          # 创建 latest 标签
+          echo "正在创建latest标签清单..."
           docker manifest create ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest \
             ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:amd64-${{ steps.get_version.outputs.VERSION }} \
             ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:arm64-${{ steps.get_version.outputs.VERSION }}
-          
-          # 将平台标注添加到清单
-          docker manifest annotate ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }} \
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:amd64-${{ steps.get_version.outputs.VERSION }} --os linux --arch amd64
-          
-          docker manifest annotate ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }} \
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:arm64-${{ steps.get_version.outputs.VERSION }} --os linux --arch arm64
-          
+            
+          echo "为latest标签添加平台标注..."
           docker manifest annotate ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest \
             ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:amd64-${{ steps.get_version.outputs.VERSION }} --os linux --arch amd64
-          
           docker manifest annotate ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest \
             ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:arm64-${{ steps.get_version.outputs.VERSION }} --os linux --arch arm64
-          
-          # 推送清单
-          docker manifest push ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}
+            
+          echo "推送latest标签清单..."
           docker manifest push ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest
       
       - name: 发布到GitHub Releases
