@@ -61,13 +61,18 @@ jobs:
           tar -czvf nilbbs-macos-amd64.tar.gz nilbbs-macos
           zip nilbbs-windows-amd64.zip nilbbs.exe
           tar -czvf nilbbs-linux-arm64.tar.gz nilbbs-arm64
-          # Go back to root directory
           cd ..
-          # Copy the amd64 binary to 'nilbbs' in the root context for the Docker build.
-          # Note: This makes the multi-platform Docker build potentially incorrect for arm64,
-          # as it will also use this amd64 binary. A better fix involves modifying the Dockerfile
-          # to select the binary based on TARGETPLATFORM.
-          cp nilbbs-linux-amd64 nilbbs
+          
+          # 准备Docker构建所需文件
+          # Linux/amd64
+          mkdir -p docker-linux-amd64
+          cp -r static templates docker-linux-amd64/
+          cp nilbbs-linux-amd64 docker-linux-amd64/nilbbs
+          
+          # Linux/arm64
+          mkdir -p docker-linux-arm64
+          cp -r static templates docker-linux-arm64/
+          cp nilbbs-linux-arm64 docker-linux-arm64/nilbbs
       
       - name: 设置Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -91,16 +96,53 @@ jobs:
           echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
           echo "构建版本: ${VERSION}"
       
-      - name: 构建并推送Docker镜像
+      - name: 构建并推送Docker镜像 (AMD64)
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./docker-linux-amd64
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           tags: |
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}-amd64
           file: ./Dockerfile
+          
+      - name: 构建并推送Docker镜像 (ARM64)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker-linux-arm64
+          push: true
+          platforms: linux/arm64
+          tags: |
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}-arm64
+          file: ./Dockerfile
+          
+      - name: 创建并推送多平台清单
+        run: |
+          # 创建并推送多平台清单
+          docker manifest create ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }} \
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}-amd64 \
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}-arm64
+            
+          docker manifest create ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest \
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}-amd64 \
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}-arm64
+            
+          # 将平台标注添加到清单
+          docker manifest annotate ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }} \
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}-amd64 --os linux --arch amd64
+            
+          docker manifest annotate ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }} \
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}-arm64 --os linux --arch arm64
+            
+          docker manifest annotate ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest \
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}-amd64 --os linux --arch amd64
+            
+          docker manifest annotate ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest \
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}-arm64 --os linux --arch arm64
+            
+          # 推送清单
+          docker manifest push ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}
+          docker manifest push ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest
       
       - name: 发布到GitHub Releases
         uses: softprops/action-gh-release@v1

@@ -8,25 +8,17 @@ WORKDIR /build
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 
-# 根据目标平台选择正确的二进制文件
+# 创建应用目录
 RUN mkdir -p /app && \
     echo "Building for $TARGETPLATFORM on $BUILDPLATFORM"
 
-# 复制所有预编译的二进制文件和资源
-COPY nilbbs-linux-amd64 /build/nilbbs-linux-amd64
-COPY nilbbs-linux-arm64 /build/nilbbs-linux-arm64
+# 复制预编译的二进制文件
+COPY nilbbs /build/nilbbs
 COPY static /app/static
 COPY templates /app/templates
 
-# 根据目标平台选择正确的二进制文件
-RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
-        cp /build/nilbbs-linux-amd64 /app/nilbbs; \
-    elif [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
-        cp /build/nilbbs-linux-arm64 /app/nilbbs; \
-    else \
-        echo "Unsupported platform: $TARGETPLATFORM"; \
-        exit 1; \
-    fi && \
+# 将二进制文件复制到应用目录并设置权限
+RUN cp /build/nilbbs /app/nilbbs && \
     chmod +x /app/nilbbs
 
 # 最终镜像
