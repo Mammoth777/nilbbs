@@ -68,11 +68,13 @@ jobs:
           mkdir -p docker-linux-amd64
           cp -r static templates docker-linux-amd64/
           cp nilbbs-linux-amd64 docker-linux-amd64/nilbbs
+          cp Dockerfile docker-linux-amd64/
           
           # Linux/arm64
           mkdir -p docker-linux-arm64
           cp -r static templates docker-linux-arm64/
           cp nilbbs-linux-arm64 docker-linux-arm64/nilbbs
+          cp Dockerfile docker-linux-arm64/
       
       - name: 设置Docker Buildx
         uses: docker/setup-buildx-action@v3
