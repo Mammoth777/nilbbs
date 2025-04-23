@@ -29,21 +29,53 @@ jobs:
       - name: 获取依赖
         run: go mod download
         
-      - name: 构建所有平台
-        run: make build-all
-        
+      - name: 安装CGO依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc libc6-dev sqlite3 libsqlite3-dev
+      
+      - name: 构建Linux/amd64（启用CGO）
+        run: |
+          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o nilbbs-linux-amd64 main.go
+      
+      - name: 构建Linux/arm64（启用CGO）
+        run: |
+          CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC=aarch64-linux-gnu-gcc go build -o nilbbs-linux-arm64 main.go
+      
+      - name: 构建其他平台（不启用CGO）
+        run: |
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o nilbbs-macos main.go
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o nilbbs.exe main.go
+
       - name: 打包发布文件
         run: |
           mkdir -p release
-          cp nilbbs-linux release/
+          cp nilbbs-linux-amd64 release/nilbbs-linux
+          cp nilbbs-linux-arm64 release/nilbbs-arm64
           cp nilbbs-macos release/
           cp nilbbs.exe release/
-          cp nilbbs-arm64 release/
           cd release
           tar -czvf nilbbs-linux-amd64.tar.gz nilbbs-linux
           tar -czvf nilbbs-macos-amd64.tar.gz nilbbs-macos
           zip nilbbs-windows-amd64.zip nilbbs.exe
           tar -czvf nilbbs-linux-arm64.tar.gz nilbbs-arm64
+      
+      - name: 准备Docker构建上下文
+        run: |
+          # 创建临时目录用于Docker构建上下文
+          mkdir -p docker-context-amd64 docker-context-arm64
+          
+          # 准备amd64上下文
+          cp Dockerfile docker-context-amd64/
+          cp nilbbs-linux-amd64 docker-context-amd64/nilbbs
+          cp -r static docker-context-amd64/
+          cp -r templates docker-context-amd64/
+          
+          # 准备arm64上下文
+          cp Dockerfile docker-context-arm64/
+          cp nilbbs-linux-arm64 docker-context-arm64/nilbbs
+          cp -r static docker-context-arm64/
+          cp -r templates docker-context-arm64/
       
       - name: 设置Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -76,6 +108,10 @@ jobs:
           tags: |
             ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}
             ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest
+          # 使用不同平台的构建上下文，而不是交叉编译
+          build-contexts: |
+            linux/amd64=docker-context-amd64
+            linux/arm64=docker-context-arm64
       
       - name: 发布到GitHub Releases
         uses: softprops/action-gh-release@v1
