@@ -110,10 +110,7 @@ jobs:
           tags: |
             ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}
             ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest
-          # 使用不同平台的构建上下文，而不是交叉编译
-          build-contexts: |
-            linux/amd64=docker-context-amd64
-            linux/arm64=docker-context-arm64
+          file: ./Dockerfile
       
       - name: 发布到GitHub Releases
         uses: softprops/action-gh-release@v1
