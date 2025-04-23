@@ -37,6 +37,42 @@ nilbbs.exe
 
 服务器将在 http://localhost:8080 启动
 
+### Docker
+
+您也可以使用 Docker 运行 nilbbs：
+
+```bash
+# 拉取最新镜像
+docker pull mammoth777/nilbbs:latest
+
+# 运行容器
+docker run -d -p 8080:8080 mammoth777/nilbbs:latest
+
+# 自定义配置
+docker run -d -p 3000:3000 -e NILBBS_PORT=3000 -e NILBBS_INACTIVE_DAYS_BEFORE_DELETE=14 mammoth777/nilbbs:latest
+```
+
+或者使用 docker-compose：
+
+```yaml
+# docker-compose.yml
+version: '3'
+services:
+  nilbbs:
+    image: mammoth777/nilbbs:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - NILBBS_INACTIVE_DAYS_BEFORE_DELETE=7
+    restart: unless-stopped
+```
+
+然后运行：
+
+```bash
+docker-compose up -d
+```
+
 ## 配置
 
 通过环境变量进行配置：

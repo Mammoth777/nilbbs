@@ -37,6 +37,42 @@ nilbbs.exe
 
 The server will start at http://localhost:8080
 
+### Docker
+
+You can also run nilbbs using Docker:
+
+```bash
+# Pull the latest image
+docker pull mammoth777/nilbbs:latest
+
+# Run the container
+docker run -d -p 8080:8080 mammoth777/nilbbs:latest
+
+# With custom configuration
+docker run -d -p 3000:3000 -e NILBBS_PORT=3000 -e NILBBS_INACTIVE_DAYS_BEFORE_DELETE=14 mammoth777/nilbbs:latest
+```
+
+Or use docker-compose:
+
+```yaml
+# docker-compose.yml
+version: '3'
+services:
+  nilbbs:
+    image: mammoth777/nilbbs:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - NILBBS_INACTIVE_DAYS_BEFORE_DELETE=7
+    restart: unless-stopped
+```
+
+Then run:
+
+```bash
+docker-compose up -d
+```
+
 ## Configuration
 
 Configuration is handled through environment variables:
