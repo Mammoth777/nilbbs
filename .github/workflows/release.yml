@@ -61,23 +61,13 @@ jobs:
           tar -czvf nilbbs-macos-amd64.tar.gz nilbbs-macos
           zip nilbbs-windows-amd64.zip nilbbs.exe
           tar -czvf nilbbs-linux-arm64.tar.gz nilbbs-arm64
-      
-      - name: 准备Docker构建上下文
-        run: |
-          # 创建临时目录用于Docker构建上下文
-          mkdir -p docker-context-amd64 docker-context-arm64
-          
-          # 准备amd64上下文
-          cp Dockerfile docker-context-amd64/
-          cp nilbbs-linux-amd64 docker-context-amd64/nilbbs
-          cp -r static docker-context-amd64/
-          cp -r templates docker-context-amd64/
-          
-          # 准备arm64上下文
-          cp Dockerfile docker-context-arm64/
-          cp nilbbs-linux-arm64 docker-context-arm64/nilbbs
-          cp -r static docker-context-arm64/
-          cp -r templates docker-context-arm64/
+          # Go back to root directory
+          cd ..
+          # Copy the amd64 binary to 'nilbbs' in the root context for the Docker build.
+          # Note: This makes the multi-platform Docker build potentially incorrect for arm64,
+          # as it will also use this amd64 binary. A better fix involves modifying the Dockerfile
+          # to select the binary based on TARGETPLATFORM.
+          cp nilbbs-linux-amd64 nilbbs
       
       - name: 设置Docker Buildx
         uses: docker/setup-buildx-action@v3
