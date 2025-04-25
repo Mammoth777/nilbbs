@@ -40,7 +40,7 @@ build-amd64:
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -ldflags="-s -w" -o releases/$(APP_NAME)-amd64 $(MAIN_FILE)
 
 build-arm64:
-	GOOS=linux GOARCH=arm64 CGO_ENABLED=1 go build -ldflags="-s -w" -o releases/$(APP_NAME)-arm64 $(MAIN_FILE)
+	CC=aarch64-linux-gnu-gcc CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o releases/$(APP_NAME)-arm64 $(MAIN_FILE)
 
 # 构建所有平台
 build-all: build-amd64 build-arm64
