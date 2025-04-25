@@ -1,4 +1,5 @@
 # 使用多阶段构建以支持多架构
+ARG TARGETPLATFORM
 FROM alpine:latest
 
 # 设置工作目录
@@ -11,10 +12,16 @@ RUN apk --no-cache add ca-certificates tzdata sqlite
 ENV TZ=Asia/Shanghai
 
 # 根据目标平台复制二进制文件
-ARG TARGETARCH=amd64
-COPY releases/nilbbs-${TARGETARCH:-linux} /app/nilbbs
+COPY releases /app
 COPY static /app/static
 COPY templates /app/templates
+
+# 根据平台选择二进制文件
+RUN case "$TARGETPLATFORM" in \
+    "linux/amd64") cp /releases/nilbbs-amd64 /app/nilbbs ;; \
+    "linux/arm64") cp /releases/nilbbs-arm64 /app/nilbbs ;; \
+    *) echo "Unsupported platform: $TARGETPLATFORM" && exit 1 ;; \
+    esac
 
 # 确保二进制文件有执行权限
 RUN chmod +x /app/nilbbs

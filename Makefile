@@ -38,17 +38,14 @@ build-prod:
 build-windows:
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o releases/$(APP_NAME).exe $(MAIN_FILE)
 
-build-linux:
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o releases/$(APP_NAME)-linux $(MAIN_FILE)
-
-build-macos:
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o releases/$(APP_NAME)-macos $(MAIN_FILE)
+build-amd64:
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o releases/$(APP_NAME)-amd64 $(MAIN_FILE)
 
 build-arm64:
 	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o releases/$(APP_NAME)-arm64 $(MAIN_FILE)
 
 # 构建所有平台
-build-all: build-windows build-linux build-macos build-arm64
+build-all: build-windows build-amd64 build-arm64
 
 # 根据当前系统自动选择构建目标
 build-current:

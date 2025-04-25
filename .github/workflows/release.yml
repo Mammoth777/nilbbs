@@ -36,171 +36,53 @@ jobs:
           # 安装ARM64交叉编译工具
           sudo apt-get install -y gcc-aarch64-linux-gnu
       
-      - name: 构建Linux/amd64（启用CGO）
+      - name: 构建
         run: |
-          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o nilbbs-linux-amd64 main.go
-      
-      - name: 构建Linux/arm64（启用CGO）
-        run: |
-          CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC=aarch64-linux-gnu-gcc go build -o nilbbs-linux-arm64 main.go
-      
-      - name: 构建其他平台（不启用CGO）
-        run: |
-          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o nilbbs-macos main.go
-          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o nilbbs.exe main.go
+            make build-all
 
-      - name: 将构建制品保存到releases目录
-        run: |
-          mkdir -p releases
-          cp nilbbs-linux-amd64 releases/nilbbs-linux
-          cp nilbbs-linux-arm64 releases/nilbbs-arm64
-          cp nilbbs-macos releases/nilbbs-macos
-          cp nilbbs.exe releases/nilbbs.exe
-
-      - name: 打包发布文件
-        run: |
-          mkdir -p release
-          cp releases/nilbbs-linux release/nilbbs-linux
-          cp releases/nilbbs-arm64 release/nilbbs-arm64
-          cp releases/nilbbs-macos release/
-          cp releases/nilbbs.exe release/
-          cd release
-          tar -czvf nilbbs-linux-amd64.tar.gz nilbbs-linux
-          tar -czvf nilbbs-macos-amd64.tar.gz nilbbs-macos
-          zip nilbbs-windows-amd64.zip nilbbs.exe
-          tar -czvf nilbbs-linux-arm64.tar.gz nilbbs-arm64
-          cd ..
-      
-      - name: 创建新的Dockerfile
-        run: |
-          # 创建一个新的Dockerfile，用于直接使用预构建的二进制文件
-          cat > Dockerfile.multi-arch << 'EOF'
-          # 多架构Dockerfile
-          FROM alpine:latest
-
-          # 设置工作目录
-          WORKDIR /app
-
-          # 安装运行时依赖
-          RUN apk --no-cache add ca-certificates tzdata sqlite
-
-          # 设置时区为亚洲/上海
-          ENV TZ=Asia/Shanghai
-
-          # 复制二进制文件和资源
-          COPY nilbbs /app/
-          COPY static /app/static
-          COPY templates /app/templates
-
-          # 确保数据目录存在
-          RUN mkdir -p /app/data
-
-          # 暴露应用端口
-          EXPOSE 8080
-
-          # 运行应用
-          CMD ["./nilbbs"]
-          EOF
-      
       - name: 设置Docker Buildx
         uses: docker/setup-buildx-action@v3
       
+      # 在登录到Docker Hub之前添加这个步骤
+      - name: 获取版本号
+        id: get_version
+        run: |
+          # 如果是标签推送，直接获取标签版本
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+            # 去掉版本号前面的'v'（如果有）
+            VERSION=${VERSION#v}
+          else
+            # 如果不是标签推送，则使用短提交哈希
+            VERSION=$(git rev-parse --short HEAD)
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "版本号: $VERSION"
+
       - name: 登录到Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
       
-      - name: 提取版本信息
-        id: get_version
-        run: |
-          # 如果是标签推送，则使用标签作为版本
-          if [[ $GITHUB_REF == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
-          else
-            # 如果是手动触发，使用latest作为版本
-            VERSION=latest
-          fi
-          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
-          echo "构建版本: ${VERSION}"
-          
-      - name: 准备Docker构建目录
-        run: |
-          # 准备AMD64构建目录
-          mkdir -p docker-linux-amd64
-          cp -r static templates docker-linux-amd64/
-          cp releases/nilbbs-linux docker-linux-amd64/nilbbs
-          cp Dockerfile.multi-arch docker-linux-amd64/Dockerfile
-          
-          # 准备ARM64构建目录
-          mkdir -p docker-linux-arm64
-          cp -r static templates docker-linux-arm64/
-          cp releases/nilbbs-arm64 docker-linux-arm64/nilbbs
-          cp Dockerfile.multi-arch docker-linux-arm64/Dockerfile
-      
-      - name: 设置 Docker
-        run: |
-          # 启用Docker实验特性
-          echo '{"experimental": true}' | sudo tee /etc/docker/daemon.json
-          sudo systemctl restart docker
-          docker version
-          
-      - name: 构建Docker镜像 (AMD64)
-        run: |
-          cd docker-linux-amd64
-          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:amd64-${{ steps.get_version.outputs.VERSION }} .
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:amd64-${{ steps.get_version.outputs.VERSION }}
-          cd ..
-          
-      - name: 构建Docker镜像 (ARM64)
-        run: |
-          cd docker-linux-arm64
-          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:arm64-${{ steps.get_version.outputs.VERSION }} .
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:arm64-${{ steps.get_version.outputs.VERSION }}
-          cd ..
-          
-      - name: 创建并推送多平台清单
-        run: |
-          # 确保使用Docker CLI的实验特性
-          export DOCKER_CLI_EXPERIMENTAL=enabled
-          
-          echo "正在创建版本标签清单..."
-          docker manifest create ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }} \
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:amd64-${{ steps.get_version.outputs.VERSION }} \
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:arm64-${{ steps.get_version.outputs.VERSION }}
-            
-          echo "为版本标签添加平台标注..."
-          docker manifest annotate ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }} \
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:amd64-${{ steps.get_version.outputs.VERSION }} --os linux --arch amd64
-          docker manifest annotate ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }} \
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:arm64-${{ steps.get_version.outputs.VERSION }} --os linux --arch arm64
-            
-          echo "推送版本标签清单..."
-          docker manifest push ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}
-          
-          echo "正在创建latest标签清单..."
-          docker manifest create --amend ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest \
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:amd64-${{ steps.get_version.outputs.VERSION }} \
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:arm64-${{ steps.get_version.outputs.VERSION }}
-            
-          echo "为latest标签添加平台标注..."
-          docker manifest annotate ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest \
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:amd64-${{ steps.get_version.outputs.VERSION }} --os linux --arch amd64
-          docker manifest annotate ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest \
-            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:arm64-${{ steps.get_version.outputs.VERSION }} --os linux --arch arm64
-            
-          echo "推送latest标签清单..."
-          docker manifest push ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest
-      
+      - name: 构建并推送多平台Docker镜像
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}
+            ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest
+
       - name: 发布到GitHub Releases
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            release/nilbbs-linux-amd64.tar.gz
-            release/nilbbs-macos-amd64.tar.gz
-            release/nilbbs-windows-amd64.zip
-            release/nilbbs-linux-arm64.tar.gz
+            release/nilbbs-amd64
+            release/nilbbs-arm64
+            release/nilbbs.exe
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -211,7 +93,6 @@ jobs:
         with:
           name: nilbbs-builds
           path: |
-            release/nilbbs-linux-amd64.tar.gz
-            release/nilbbs-macos-amd64.tar.gz
-            release/nilbbs-windows-amd64.zip
-            release/nilbbs-linux-arm64.tar.gz
+            release/nilbbs-amd64
+            release/nilbbs-arm64
+            release/nilbbs.exe
