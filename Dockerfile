@@ -1,40 +1,48 @@
-# 使用多阶段构建以支持多架构
-FROM alpine:latest
-
-# 继续使用 TARGETPLATFORM ARG
-ARG TARGETPLATFORM
+# 第一阶段：构建阶段
+FROM golang:1.23-alpine AS builder
 
 # 设置工作目录
 WORKDIR /app
 
-# 安装运行时依赖
-RUN apk --no-cache add ca-certificates tzdata sqlite
+# 安装必要的构建工具和依赖
+RUN apk add --no-cache gcc musl-dev make git
 
-# 设置时区为亚洲/上海
-ENV TZ=Asia/Shanghai
+# 复制go.mod和go.sum文件，先下载依赖
+COPY go.mod go.sum ./
+RUN go mod download
 
-# 复制文件到容器
-COPY releases/ /app/releases/
-COPY static/ /app/static/
-COPY templates/ /app/templates/
+# 复制所有源代码
+COPY . .
 
-# 根据平台选择二进制文件
-RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
-      cp /app/releases/nilbbs-amd64 /app/nilbbs; \
-    elif [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
-      cp /app/releases/nilbbs-arm64 /app/nilbbs; \
-    else \
-      echo "Unsupported platform: $TARGETPLATFORM" && exit 1; \
-    fi
+# 基于当前构建架构编译
+ARG TARGETARCH
+ARG CGO_ENABLED=1
+RUN echo "Building for architecture: ${TARGETARCH}" && \
+    go build -ldflags="-s -w" -o nilbbs .
 
-# 确保二进制文件有执行权限
-RUN chmod +x /app/nilbbs
+# 第二阶段：运行阶段
+FROM alpine:latest
 
-# 确保数据目录存在
+# 安装SQLite运行时依赖
+RUN apk add --no-cache ca-certificates tzdata sqlite
+
+# 设置工作目录
+WORKDIR /app
+
+# 从构建阶段复制编译好的应用
+COPY --from=builder /app/nilbbs /app/
+# 复制必要的静态资源和模板
+COPY --from=builder /app/static /app/static
+COPY --from=builder /app/templates /app/templates
+# 创建数据目录
 RUN mkdir -p /app/data
 
-# 暴露应用端口
-EXPOSE 8080
+# 设置默认环境变量
+ENV SERVER_PORT=8080
+ENV INACTIVE_DAYS_BEFORE_DELETE=30
 
-# 运行应用
-CMD ["./nilbbs"]
+# 暴露端口
+EXPOSE ${SERVER_PORT}
+
+# 设置入口点
+ENTRYPOINT ["/app/nilbbs"]

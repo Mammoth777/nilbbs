@@ -42,8 +42,15 @@ build-amd64:
 build-arm64:
 	CC=aarch64-linux-gnu-gcc CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o releases/$(APP_NAME)-arm64 $(MAIN_FILE)
 
+build-macos-amd64:
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 go build -ldflags="-s -w" -o releases/$(APP_NAME)-macos-amd64 $(MAIN_FILE)
+
+build-macos-arm64:
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 go build -ldflags="-s -w" -o releases/$(APP_NAME)-macos-arm64 $(MAIN_FILE)
+
 # 构建所有平台
-build-all: build-amd64 build-arm64
+build-all: build-amd64 build-arm64 build-macos-amd64 build-macos-arm64
+	@echo "所有平台构建完成！"
 
 # 根据当前系统自动选择构建目标
 build-current:

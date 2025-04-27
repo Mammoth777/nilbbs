@@ -24,7 +24,7 @@ jobs:
       - name: 设置Go环境
         uses: actions/setup-go@v4
         with:
-          go-version: '1.21'  # 请根据您的项目需求调整Go版本
+          go-version: '1.23'  # 与Dockerfile中一致的Go版本
           
       - name: 获取依赖
         run: go mod download
@@ -36,14 +36,30 @@ jobs:
           # 安装ARM64交叉编译工具
           sudo apt-get install -y gcc-aarch64-linux-gnu
       
-      - name: 构建
+      - name: 创建releases目录
+        run: mkdir -p releases
+      
+      - name: 构建二进制文件
         run: |
-            make build-all
+          # 构建AMD64版本
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -ldflags="-s -w" -o releases/nilbbs-amd64 main.go
+          
+          # 构建ARM64版本
+          CC=aarch64-linux-gnu-gcc CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o releases/nilbbs-arm64 main.go
+          
+          # 构建Windows版本
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o releases/nilbbs.exe main.go
+          
+          # 构建macOS ARM64版本
+          GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o releases/nilbbs-macos-arm64 main.go
+          
+          # 添加执行权限
+          chmod +x releases/nilbbs-*
 
       - name: 设置Docker Buildx
         uses: docker/setup-buildx-action@v3
       
-      # 在登录到Docker Hub之前添加这个步骤
+      # 获取版本号
       - name: 获取版本号
         id: get_version
         run: |
@@ -70,19 +86,22 @@ jobs:
         with:
           context: .
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
           tags: |
             ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:${{ steps.get_version.outputs.VERSION }}
             ${{ secrets.DOCKER_HUB_USERNAME }}/nilbbs:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: 发布到GitHub Releases
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            release/nilbbs-amd64
-            release/nilbbs-arm64
-            release/nilbbs.exe
+            releases/nilbbs-amd64
+            releases/nilbbs-arm64
+            releases/nilbbs.exe
+            releases/nilbbs-macos-arm64
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -93,6 +112,7 @@ jobs:
         with:
           name: nilbbs-builds
           path: |
-            release/nilbbs-amd64
-            release/nilbbs-arm64
-            release/nilbbs.exe
+            releases/nilbbs-amd64
+            releases/nilbbs-arm64
+            releases/nilbbs.exe
+            releases/nilbbs-macos-arm64
