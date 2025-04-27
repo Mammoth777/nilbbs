@@ -10,6 +10,7 @@ import (
 
 	"github.com/Mammoth777/nilbbs/database"
 	"github.com/Mammoth777/nilbbs/handlers"
+	"github.com/Mammoth777/nilbbs/nickname"
 	"github.com/Mammoth777/nilbbs/utils"
 	"github.com/gin-gonic/gin"
 )
@@ -89,6 +90,9 @@ func main() {
 
 	// 评论路由
 	r.POST("/api/posts/:id/comments", handlers.AddComment)
+	r.GET("/api/random-go-nickname", func(c *gin.Context) {
+    	c.String(http.StatusOK, nickname.GetRandomNickname())
+	})
 
 	// 设置优雅关闭
 	srv := &http.Server{

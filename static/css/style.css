@@ -35,6 +35,11 @@ body {
   align-items: center;
 }
 
+.navbar-brand {
+  margin: 0;
+  margin-right: auto; /* Push nickname container to the right */
+}
+
 .navbar a {
   color: #444;
   text-decoration: none;
@@ -45,37 +50,40 @@ body {
   color: #0066aa;
 }
 
-.navbar-brand {
-  font-size: 1.4rem;
-  font-weight: 300;
-  margin: 0;
-  letter-spacing: 0.1em;
-}
-
-/* 昵称输入框 */
+/* 昵称样式 */
 .nickname-container {
   position: relative;
+  cursor: pointer;
+}
+
+.user-nickname {
+  padding: 5px 10px;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+}
+.nickname-text {
+  padding: 0 5px;
+  margin-right: 10px;
+}
+.nickname-text:hover {
+  border-bottom: 5px solid #6b99c3;
+}
+
+.random-icon {
+  display: inline-block;
+  transition: all 0.5s ease;
+  transform-origin: center;
+  transform: rotate(0deg);
+}
+.random-icon:hover {
+  transform: rotate(360deg);
 }
 
 .nickname-input {
-  width: 150px;
-  height: 30px;
-  padding: 5px 8px;
-  font-size: 0.85rem;
-  border: 1px solid #ddd;
-  background-color: rgba(255, 255, 255, 0.8);
-  transition: all 0.2s ease;
-}
-
-.nickname-input:focus {
-  border-color: #6b99c3;
-  background-color: white;
-  width: 180px;
-}
-
-.nickname-input::placeholder {
-  color: #aaa;
-  font-style: italic;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  width: 150px; /* Adjust width as needed */
 }
 
 /* 按钮和表单 - 几何感按钮 */

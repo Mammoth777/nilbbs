@@ -4,6 +4,9 @@ NilBBS is a minimalist anonymous bulletin board system (BBS) that supports posti
 
 [English](README.md) | [中文](README_zh.md)
 
+![NilBBS Screenshot 1](images/img1.png)
+![NilBBS Screenshot 2](images/img2.png)
+
 ## Features
 
 - [x] Minimalist design
@@ -14,28 +17,26 @@ NilBBS is a minimalist anonymous bulletin board system (BBS) that supports posti
 
 ## Quick Start
 
-### Download
+### Running with Executable
 
-1. Download the latest release for your platform from [GitHub Releases](https://github.com/Mammoth777/nilbbs/releases).
+1.  **Download**: Download the latest release for your platform from [GitHub Releases](https://github.com/Mammoth777/nilbbs/releases).
+2.  **Extract**: Extract the archive (if applicable).
+3.  **Run**:
+    *   Open a terminal and navigate to the extracted directory.
+    *   Run the executable:
 
-2. Extract the archive (if applicable).
+    ```bash
+    # On macOS/Linux
+    chmod +x ./nilbbs
+    ./nilbbs
 
-### Run
+    # On Windows
+    nilbbs.exe
+    ```
 
-1. Open a terminal and navigate to the extracted directory.
+The server will start at http://localhost:8080.
 
-2. Run the executable:
-
-```bash
-# On macOS/Linux
-chmod +x ./nilbbs
-./nilbbs
-
-# On Windows
-nilbbs.exe
-```
-
-The server will start at http://localhost:8080
+You can configure the application using environment variables, such as setting the port or the automatic post deletion time. See the [Configuration](#configuration) section for details.
 
 ### Docker
 

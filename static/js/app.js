@@ -31,16 +31,90 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   
-  // Ensure nickname exists in SessionStorage
+  // Ensure nickname exists in SessionStorage and display it
   initNickname();
+  displayNickname();
 });
 
 // Initialize nickname
 function initNickname() {
-  // Set default value if nickname doesn't exist in SessionStorage
   if (!sessionStorage.getItem('userNickname')) {
-    sessionStorage.setItem('userNickname', 'AnonymousUser');
+    fetch('/api/random-go-nickname')
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to get nickname');
+        return res.text();
+      })
+      .then(nickname => {
+        sessionStorage.setItem('userNickname', nickname.trim() || 'AnonymousUser');
+        displayNickname();
+      })
+      .catch(() => {
+        sessionStorage.setItem('userNickname', 'AnonymousUser');
+        displayNickname();
+      });
   }
+}
+
+// Display current nickname
+function displayNickname() {
+  const nicknameDisplay = document.getElementById('user-nickname-display');
+  if (!nicknameDisplay) return;
+  nicknameDisplay.innerHTML = ''; // 清空
+
+  const nicknameText = document.createElement('span');
+  nicknameText.className = 'nickname-text';
+  nicknameText.textContent = getCurrentNickname();
+  nicknameText.onclick = () => editNickname();
+
+  const randomIcon = document.createElement('span');
+  randomIcon.className = 'random-icon';
+  randomIcon.textContent = '🎲';
+  randomIcon.onclick = () => randomizeNickname();
+
+  nicknameDisplay.appendChild(nicknameText);
+  nicknameDisplay.appendChild(randomIcon);
+}
+
+// Switch to nickname edit mode
+function editNickname() {
+  const nicknameContainer = document.getElementById('nickname-container');
+  const currentNickname = getCurrentNickname();
+
+  if (!nicknameContainer) return;
+
+  // Create input field
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = currentNickname;
+  input.className = 'nickname-input improved-style'; 
+  input.maxLength = 20; // Optional: limit nickname length
+
+  // Handle input confirmation (Enter or Blur)
+  const saveNickname = () => {
+    const newNickname = input.value.trim();
+    if (newNickname && newNickname !== currentNickname) {
+      sessionStorage.setItem('userNickname', newNickname);
+    }
+    // Restore display regardless of change
+    nicknameContainer.innerHTML = ''; // Clear input
+    const span = document.createElement('span');
+    span.id = 'user-nickname-display';
+    span.className = 'user-nickname';
+    nicknameContainer.appendChild(span);
+    displayNickname(); // Re-display (potentially updated) nickname and re-attach listener
+  };
+
+  input.addEventListener('blur', saveNickname);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      saveNickname();
+    }
+  });
+
+  // Replace span with input
+  nicknameContainer.innerHTML = ''; // Clear existing span
+  nicknameContainer.appendChild(input);
+  input.focus(); // Focus the input field
 }
 
 // Get current nickname
@@ -222,4 +296,18 @@ function showError(message) {
     errorElement.textContent = message;
     errorElement.style.display = 'block';
   }
+}
+
+// Randomize nickname
+function randomizeNickname() {
+  fetch('/api/random-go-nickname')
+    .then(res => {
+      if (!res.ok) throw new Error('Failed to get nickname');
+      return res.text();
+    })
+    .then(nickname => {
+      sessionStorage.setItem('userNickname', nickname.trim() || 'AnonymousUser');
+      displayNickname();
+    })
+    .catch(() => {});
 }

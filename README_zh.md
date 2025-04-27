@@ -4,6 +4,9 @@ NilBBS 是一个极简匿名留言板系统，支持发帖和回复功能。
 
 [English](README.md) | [中文](README_zh.md)
 
+![NilBBS Screenshot 1](images/img1.png)
+![NilBBS Screenshot 2](images/img2.png)
+
 ## 功能特点
 
 - [x] 极简设计
@@ -14,28 +17,26 @@ NilBBS 是一个极简匿名留言板系统，支持发帖和回复功能。
 
 ## 快速开始
 
-### 下载
+### 通过可执行文件运行
 
-1. 从 [GitHub Releases](https://github.com/Mammoth777/nilbbs/releases) 下载适合您平台的最新版本。
+1.  **下载**: 从 [GitHub Releases](https://github.com/Mammoth777/nilbbs/releases) 下载适合您平台的最新版本。
+2.  **解压**: 解压下载的文件（如有需要）。
+3.  **运行**:
+    *   打开终端并导航到解压后的目录。
+    *   运行可执行文件：
 
-2. 解压下载的文件（如有需要）。
+    ```bash
+    # 在 macOS/Linux 上
+    chmod +x ./nilbbs
+    ./nilbbs
 
-### 运行
+    # 在 Windows 上
+    nilbbs.exe
+    ```
 
-1. 打开终端并导航到解压后的目录。
+服务器将在 http://localhost:8080 启动。
 
-2. 运行可执行文件：
-
-```bash
-# 在 macOS/Linux 上
-chmod +x ./nilbbs
-./nilbbs
-
-# 在 Windows 上
-nilbbs.exe
-```
-
-服务器将在 http://localhost:8080 启动
+您可以通过环境变量来配置应用，例如设置端口或帖子自动删除时间。详情请参阅 [配置](#配置) 部分。
 
 ### Docker
 
