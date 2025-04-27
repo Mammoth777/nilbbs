@@ -5,7 +5,7 @@ FROM golang:1.23-alpine AS builder
 WORKDIR /app
 
 # 安装必要的构建工具和依赖
-RUN apk add --no-cache gcc musl-dev make git
+RUN apk add --no-cache gcc musl-dev make git sqlite-dev
 
 # 复制go.mod和go.sum文件，先下载依赖
 COPY go.mod go.sum ./
@@ -17,8 +17,9 @@ COPY . .
 # 基于当前构建架构编译
 ARG TARGETARCH
 ARG CGO_ENABLED=1
+# 添加编译标志以解决pread64/pwrite64问题
 RUN echo "Building for architecture: ${TARGETARCH}" && \
-    go build -ldflags="-s -w" -o nilbbs .
+    CGO_CFLAGS="-D_LARGEFILE64_SOURCE" go build -ldflags="-s -w" -o nilbbs .
 
 # 第二阶段：运行阶段
 FROM alpine:latest

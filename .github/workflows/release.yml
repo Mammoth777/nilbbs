@@ -42,10 +42,10 @@ jobs:
       - name: 构建二进制文件
         run: |
           # 构建AMD64版本
-          GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -ldflags="-s -w" -o releases/nilbbs-amd64 main.go
+          CGO_CFLAGS="-D_LARGEFILE64_SOURCE" GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -ldflags="-s -w" -o releases/nilbbs-amd64 main.go
           
           # 构建ARM64版本
-          CC=aarch64-linux-gnu-gcc CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o releases/nilbbs-arm64 main.go
+          CGO_CFLAGS="-D_LARGEFILE64_SOURCE" CC=aarch64-linux-gnu-gcc CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o releases/nilbbs-arm64 main.go
           
           # 构建Windows版本
           GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o releases/nilbbs.exe main.go
