@@ -37,7 +37,9 @@ build-prod:
 # 为不同操作系统构建
 
 build-amd64:
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -ldflags="-s -w" -o releases/$(APP_NAME)-amd64 $(MAIN_FILE)
+	# GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -ldflags="-s -w" -o releases/$(APP_NAME)-amd64 $(MAIN_FILE)
+	docker run --rm -v $(PWD):/app -w /app golang:latest \
+		/bin/bash -c "GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -ldflags='-s -w' -o "releases/$(APP_NAME)-amd64" $(MAIN_FILE)"
 
 build-arm64:
 	CC=aarch64-linux-gnu-gcc CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o releases/$(APP_NAME)-arm64 $(MAIN_FILE)
@@ -77,6 +79,22 @@ run-small: build-small
 deps:
 	go mod why -m all
 
+# 打包发布文件
+package:
+	@echo "将发布文件和静态资源打包成tar包..."
+	@VERSION=$$(date +"%Y%m%d_%H%M%S"); \
+	mkdir -p dist; \
+	mkdir -p releases/assets releases/static releases/templates; \
+	cp -r assets/* releases/assets/; \
+	cp -r static/* releases/static/; \
+	cp -r templates/* releases/templates/; \
+	cd releases && tar -czf ../dist/$(APP_NAME)-$$VERSION.tar.gz * && cd ..; \
+	echo "创建成功: dist/$(APP_NAME)-$$VERSION.tar.gz"
+
+# 构建并打包
+build-package: build-all package
+	@echo "构建和打包流程完成"
+
 # 构建Docker镜像
 docker-build:
 	docker build -t $(APP_NAME):latest .
@@ -85,4 +103,4 @@ docker-build:
 .DEFAULT_GOAL := build
 
 # 声明伪目标
-.PHONY: build build-small build-prod size clean run run-small deps docker-build build-windows build-linux build-macos build-arm64 build-all build-current
+.PHONY: build build-small build-prod size clean run run-small deps docker-build build-windows build-linux build-macos build-arm64 build-all build-current package build-package

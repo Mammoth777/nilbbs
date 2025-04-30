@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ .title }}</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <h1 class="navbar-brand">
+        <a href="/">
+          nilbbs
+          <span class="tip">Click, back to list</span>
+        </a>
+      </h1>
+      <div id="nickname-container" class="nickname-container">
+        <span id="user-nickname-display" class="user-nickname"></span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div id="post-container">
+      <p>Loading...</p>
+    </div>
+
+    <div id="comments-container" class="comments"></div>
+
+    <div class="comment-form">
+      <form id="comment-form" onsubmit="addComment(event, '{{ .postID }}')">
+        <div class="form-group">
+          <textarea id="comment-content" class="form-control" rows="3" placeholder="Press Ctrl/Cmd + Enter to submit"
+            required></textarea>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+
+</html>
