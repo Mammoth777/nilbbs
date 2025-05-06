@@ -129,22 +129,8 @@ go build
 
 ```bash
 # 构建应用
-make build
-
-# 构建更小体积的可执行文件
-make build-small
-
-# 为生产环境构建（禁用CGO）
-make build-prod
-
-# 为特定平台构建
-make build-windows
-make build-linux
-make build-macos
-make build-arm64
-
-# 为所有平台构建
-make build-all
+make build-amd64 # 构建适用于 amd64 的应用
+make package # 打包应用
 ```
 
 ## API 接口

@@ -93,15 +93,42 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: 创建包含静态资源的发布包
+        run: |
+          # 为每个平台创建带有静态资源的压缩包
+          # Linux AMD64
+          mkdir -p nilbbs-linux-amd64
+          cp releases/nilbbs-amd64 nilbbs-linux-amd64/nilbbs
+          cp -r assets static templates nilbbs-linux-amd64/
+          tar -czf releases/nilbbs-linux-amd64.tar.gz -C nilbbs-linux-amd64 .
+          
+          # Linux ARM64
+          mkdir -p nilbbs-linux-arm64
+          cp releases/nilbbs-arm64 nilbbs-linux-arm64/nilbbs
+          cp -r assets static templates nilbbs-linux-arm64/
+          tar -czf releases/nilbbs-linux-arm64.tar.gz -C nilbbs-linux-arm64 .
+          
+          # Windows
+          mkdir -p nilbbs-windows
+          cp releases/nilbbs.exe nilbbs-windows/
+          cp -r assets static templates nilbbs-windows/
+          zip -r releases/nilbbs-windows.zip nilbbs-windows/
+          
+          # macOS ARM64
+          mkdir -p nilbbs-macos-arm64
+          cp releases/nilbbs-macos-arm64 nilbbs-macos-arm64/nilbbs
+          cp -r assets static templates nilbbs-macos-arm64/
+          tar -czf releases/nilbbs-macos-arm64.tar.gz -C nilbbs-macos-arm64 .
+
       - name: 发布到GitHub Releases
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            releases/nilbbs-amd64
-            releases/nilbbs-arm64
-            releases/nilbbs.exe
-            releases/nilbbs-macos-arm64
+            releases/nilbbs-linux-amd64.tar.gz
+            releases/nilbbs-linux-arm64.tar.gz
+            releases/nilbbs-windows.zip
+            releases/nilbbs-macos-arm64.tar.gz
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

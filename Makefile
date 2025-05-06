@@ -37,9 +37,10 @@ build-prod:
 # 为不同操作系统构建
 
 build-amd64:
-	# GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -ldflags="-s -w" -o releases/$(APP_NAME)-amd64 $(MAIN_FILE)
+	mkdir -p releases
+	# 安装正确的工具链并启用 CGO 错误
 	docker run --rm -v $(PWD):/app -w /app golang:latest \
-		/bin/bash -c "GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -ldflags='-s -w' -o "releases/$(APP_NAME)-amd64" $(MAIN_FILE)"
+		/bin/bash -c "apt-get update && apt-get install -y gcc-multilib && GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -ldflags='-s -w' -o releases/$(APP_NAME)-amd64 $(MAIN_FILE)"
 
 build-arm64:
 	CC=aarch64-linux-gnu-gcc CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o releases/$(APP_NAME)-arm64 $(MAIN_FILE)

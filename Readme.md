@@ -128,23 +128,8 @@ go build
 The project includes a Makefile for common operations:
 
 ```bash
-# Build the application
-make build
-
-# Build with reduced binary size
-make build-small
-
-# Build for production (CGO disabled)
-make build-prod
-
-# Build for specific platforms
-make build-windows
-make build-linux
-make build-macos
-make build-arm64
-
-# Build for all platforms
-make build-all
+make build-amd64 # Build for amd64
+make package # Package the application
 ```
 
 ## API Endpoints
