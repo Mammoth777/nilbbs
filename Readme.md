@@ -34,6 +34,19 @@ NilBBS is a minimalist anonymous bulletin board system (BBS) that supports posti
     nilbbs.exe
     ```
 
+    *   To run in the background on Linux/macOS (using nohup):
+    
+    ```bash
+    # Run in background and redirect output to nohup.out
+    nohup ./nilbbs &
+    
+    # Or specify a custom log file
+    nohup ./nilbbs > nilbbs.log 2>&1 &
+    
+    # Check if the process is running
+    ps aux | grep nilbbs
+    ```
+
 The server will start at http://localhost:8080.
 
 You can configure the application using environment variables, such as setting the port or the automatic post deletion time. See the [Configuration](#configuration) section for details.

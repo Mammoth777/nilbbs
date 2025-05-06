@@ -38,6 +38,22 @@ NilBBS 是一个极简匿名留言板系统，支持发帖和回复功能。
 
 您可以通过环境变量来配置应用，例如设置端口或帖子自动删除时间。详情请参阅 [配置](#配置) 部分。
 
+### 使用 nohup 后台运行
+
+您可以使用 nohup 命令在后台运行 nilbbs，即使终端关闭也能保持运行：
+
+```bash
+# 在 macOS/Linux 上
+chmod +x ./nilbbs
+nohup ./nilbbs > nilbbs.log 2>&1 &
+
+# 查看进程
+ps aux | grep nilbbs
+
+# 如需停止服务
+kill $(pgrep nilbbs)
+```
+
 ### Docker
 
 您也可以使用 Docker 运行 nilbbs：
