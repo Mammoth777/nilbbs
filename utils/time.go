@@ -20,6 +20,7 @@ func ParseTimeCST(timeStr string) (time.Time, error) {
 	t, err := time.Parse(time.RFC3339, timeStr)
 	if err == nil {
 		// 这里不使用 t.In(CSTZone)，而是创建一个新的时间，保持时间值不变，但更改时区
+		// todo 可能是存的时候有点问题
 		return time.Date(
 			t.Year(), t.Month(), t.Day(),
 			t.Hour(), t.Minute(), t.Second(), t.Nanosecond(),
