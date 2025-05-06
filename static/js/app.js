@@ -36,6 +36,13 @@ document.addEventListener('DOMContentLoaded', function() {
   displayNickname();
 });
 
+function formatDate(dateString) {
+  const d = new Date(dateString);
+  const str = d.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+  console.log('Formatted date:', str);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
 // Initialize nickname
 function initNickname() {
   if (!sessionStorage.getItem('userNickname')) {
@@ -136,7 +143,7 @@ async function loadPosts() {
     
     if (data.posts && data.posts.length > 0) {
       data.posts.forEach(post => {
-        const date = new Date(post.created_at).toLocaleString('en-US');
+        const date = formatDate(post.created_at);
         const preview = post.content.length > 80 ? post.content.substring(0, 80) + '...' : post.content;
         
         postList.innerHTML += `
@@ -169,7 +176,7 @@ async function loadPost(postId) {
     const post = data.post;
     if (!post) throw new Error('Post does not exist');
     
-    const date = new Date(post.created_at).toLocaleString('en-US');
+    const date = formatDate(post.created_at);
     
     postContainer.innerHTML = `
       <div class="post-content">${post.content}</div>
@@ -180,7 +187,7 @@ async function loadPost(postId) {
     
     if (post.comments && post.comments.length > 0) {
       post.comments.forEach(comment => {
-        const commentDate = new Date(comment.created_at).toLocaleString('en-US');
+        const commentDate = formatDate(comment.created_at);
         commentsContainer.innerHTML += `
           <div class="comment">
             <div class="comment-content">${comment.content}</div>

@@ -69,12 +69,13 @@ func GetAllPosts(c *gin.Context) {
 	var posts []models.Post
 	for rows.Next() {
 		var post models.Post
-		var createdAt string
+		var createdAt string // 2025-05-06T16:31:34Z
 		err := rows.Scan(&post.ID, &post.Content, &post.Author, &createdAt)
 		if err != nil {
 			log.Printf("扫描帖子数据失败: %v", err)
 			continue
 		}
+		log.Println(createdAt, "createdAt")
 		t, err := utils.ParseTimeCST(createdAt)
 		if err != nil {
 			log.Printf("解析时间失败: %v", err)
