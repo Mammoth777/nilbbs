@@ -52,6 +52,12 @@ func AddComment(c *gin.Context) {
 
 	commentID, _ := result.LastInsertId()
 	
+	// 更新帖子的删除时间（基于最新评论时间）
+	if err := database.UpdatePostDeleteTime(postID, utils.Config.InactiveDaysBeforeDelete); err != nil {
+		log.Printf("更新帖子删除时间失败: %v", err)
+		// 不要因为更新删除时间失败而中断正常流程
+	}
+	
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "评论添加成功",
 		"comment_id": commentID,

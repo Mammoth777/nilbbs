@@ -10,6 +10,7 @@ type Post struct {
 	Content   string    `json:"content"`
 	Author    string    `json:"author"`
 	CreatedAt time.Time `json:"created_at"`
+	DeleteAt  time.Time `json:"delete_at"`
 	Comments  []Comment `json:"comments,omitempty"`
 }
 

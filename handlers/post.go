@@ -33,11 +33,14 @@ func CreatePost(c *gin.Context) {
 
 	// 使用CST时区创建当前时间
 	now := utils.NowCST()
+	
+	// 计算删除时间（当前时间 + 不活跃天数）
+	deleteAt := now.AddDate(0, 0, utils.Config.InactiveDaysBeforeDelete)
 
-	// 存储新帖子
+	// 存储新帖子，包含删除时间
 	result, err := database.DB.Exec(
-		"INSERT INTO posts (content, author, created_at) VALUES (?, ?, ?)",
-		post.Content, post.Author, utils.FormatTimeCST(now))
+		"INSERT INTO posts (content, author, created_at, delete_at) VALUES (?, ?, ?, ?)",
+		post.Content, post.Author, utils.FormatTimeCST(now), utils.FormatTimeCST(deleteAt))
 	if err != nil {
 		log.Printf("创建帖子失败: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "服务器内部错误"})
@@ -54,11 +57,17 @@ func CreatePost(c *gin.Context) {
 
 // GetAllPosts 获取所有帖子
 func GetAllPosts(c *gin.Context) {
+	// 获取当前时间，用于过滤已过期的帖子
+	now := utils.NowCST()
+	nowStr := utils.FormatTimeCST(now)
+	
+	// 查询未过期的帖子，使用delete_at字段判断
 	rows, err := database.DB.Query(`
-		SELECT id, content, author, created_at 
+		SELECT id, content, author, created_at, delete_at
 		FROM posts
+		WHERE delete_at > ?
 		ORDER BY created_at DESC
-	`)
+	`, nowStr)
 	if err != nil {
 		log.Printf("查询帖子失败: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "服务器内部错误"})
@@ -69,20 +78,31 @@ func GetAllPosts(c *gin.Context) {
 	var posts []models.Post
 	for rows.Next() {
 		var post models.Post
-		var createdAt string // 2025-05-06T16:31:34Z
-		err := rows.Scan(&post.ID, &post.Content, &post.Author, &createdAt)
+		var createdAt string
+		var deleteAt string
+		err := rows.Scan(&post.ID, &post.Content, &post.Author, &createdAt, &deleteAt)
 		if err != nil {
 			log.Printf("扫描帖子数据失败: %v", err)
 			continue
 		}
-		log.Println(createdAt, "createdAt")
+		
 		t, err := utils.ParseTimeCST(createdAt)
 		if err != nil {
-			log.Printf("解析时间失败: %v", err)
+			log.Printf("解析创建时间失败: %v", err)
 			// 使用当前时间作为后备
 			t = utils.NowCST()
 		}
 		post.CreatedAt = t
+		
+		// 解析删除时间
+		dt, err := utils.ParseTimeCST(deleteAt)
+		if err != nil {
+			log.Printf("解析删除时间失败: %v", err)
+			// 使用创建时间加上默认过期天数作为后备
+			dt = t.AddDate(0, 0, utils.Config.InactiveDaysBeforeDelete)
+		}
+		post.DeleteAt = dt
+		
 		posts = append(posts, post)
 	}
 
@@ -99,19 +119,24 @@ func GetPostByID(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的帖子ID"})
 		return
 	}
-
-	// 查询帖子
+	
+	// 获取当前时间，用于过滤已过期的帖子
+	now := utils.NowCST()
+	nowStr := utils.FormatTimeCST(now)
+	
+	// 查询帖子，使用delete_at字段判断是否过期
 	var post models.Post
 	var createdAt string
+	var deleteAt string
 	err = database.DB.QueryRow(`
-		SELECT id, content, author, created_at 
+		SELECT id, content, author, created_at, delete_at
 		FROM posts
-		WHERE id = ?
-	`, postID).Scan(&post.ID, &post.Content, &post.Author, &createdAt)
+		WHERE id = ? AND delete_at > ?
+	`, postID, nowStr).Scan(&post.ID, &post.Content, &post.Author, &createdAt, &deleteAt)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "帖子不存在"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "帖子不存在或已过期"})
 			return
 		}
 		log.Printf("查询帖子失败: %v", err)
@@ -121,11 +146,20 @@ func GetPostByID(c *gin.Context) {
 
 	t, err := utils.ParseTimeCST(createdAt)
 	if err != nil {
-		log.Printf("解析帖子时间失败: %v", err)
+		log.Printf("解析帖子创建时间失败: %v", err)
 		// 使用当前时间作为后备
 		t = utils.NowCST()
 	}
 	post.CreatedAt = t
+	
+	// 解析删除时间
+	dt, err := utils.ParseTimeCST(deleteAt)
+	if err != nil {
+		log.Printf("解析删除时间失败: %v", err)
+		// 使用创建时间加上默认过期天数作为后备
+		dt = t.AddDate(0, 0, utils.Config.InactiveDaysBeforeDelete)
+	}
+	post.DeleteAt = dt
 
 	// 查询评论
 	rows, err := database.DB.Query(`

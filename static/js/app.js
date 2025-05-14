@@ -5,6 +5,12 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 监听 hashchange 事件以处理路由变化
   window.addEventListener('hashchange', function() {
+    // 在路由变化时，清除现有的倒计时定时器
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
+    
     initializePageByRoute();
   });
   
@@ -12,6 +18,16 @@ document.addEventListener('DOMContentLoaded', function() {
   initNickname();
   displayNickname();
 });
+
+// 向父窗口发送消息的统一方法
+function sendMessageToParent(type, data) {
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage({
+      type: type,
+      data: data
+    }, '*');
+  }
+}
 
 // 初始化页面基于当前路由
 function initializePageByRoute() {
@@ -266,14 +282,23 @@ async function loadPosts() {
       data.posts.forEach(post => {
         const date = formatDate(post.created_at);
         const preview = post.content.length > 80 ? post.content.substring(0, 80) + '...' : post.content;
+        // 计算初始倒计时，使用服务器返回的delete_at时间
+        const countdown = calculateCountdown(post.created_at, post.delete_at);
+        const countdownClass = countdown.status ? `countdown-tag ${countdown.status}` : 'countdown-tag';
         
         postList.innerHTML += `
           <li class="post-item">
             <div class="post-content"><a href="#" data-post-id="${post.id}" onclick="navigateToPost(event, ${post.id})">${preview}</a></div>
-            <div class="post-meta">${post.author} · ${date}</div>
+            <div class="post-meta">
+              <span class="post-meta-info">${post.author} · ${date}</span>
+              <span class="${countdownClass}" data-created-at="${post.created_at}" data-delete-at="${post.delete_at}">${countdown.text}</span>
+            </div>
           </li>
         `;
       });
+      
+      // 启动倒计时更新
+      startCountdownTimer();
     } else {
       postList.innerHTML = '<li class="post-item">No posts yet</li>';
     }
@@ -299,11 +324,20 @@ async function loadPost(postId) {
     if (!post) throw new Error('Post does not exist');
     
     const date = formatDate(post.created_at);
+    // 计算倒计时，使用服务器返回的delete_at时间
+    const countdown = calculateCountdown(post.created_at, post.delete_at);
+    const countdownClass = countdown.status ? `countdown-tag ${countdown.status}` : 'countdown-tag';
     
     postContainer.innerHTML = `
       <div class="post-content">${post.content}</div>
-      <div class="post-meta">${post.author} · ${date}</div>
+      <div class="post-meta">
+        <span class="post-meta-info">${post.author} · ${date}</span>
+        <span class="${countdownClass}" data-created-at="${post.created_at}" data-delete-at="${post.delete_at}">${countdown.text}</span>
+      </div>
     `;
+    
+    // 确保倒计时定时器在加载帖子详情时也启动
+    startCountdownTimer();
     
     commentsContainer.innerHTML = '<h3 class="no-margin">Comments</h3>';
     
@@ -465,12 +499,133 @@ function randomizeNickname() {
     .catch(() => {});
 }
 
-// 向父窗口发送消息（如果存在）
-function sendMessageToParent(type, data) {
-  if (window.parent && window.parent !== window) {
-    window.parent.postMessage({
-      type: type,
-      data: data
-    }, '*');
+// 计算并格式化倒计时
+function calculateCountdown(createdAt, deleteAt) {
+  // 获取删除时间（如果没有提供，则基于创建时间计算）
+  let expiryDate;
+  if (deleteAt) {
+    expiryDate = new Date(deleteAt);
+  } else {
+    // 后备计算方式：使用创建时间 + 7天（如果服务器没返回delete_at）
+    const postDate = new Date(createdAt);
+    expiryDate = new Date(postDate);
+    expiryDate.setDate(expiryDate.getDate() + 7);
   }
+  
+  // 计算距离过期的剩余时间（毫秒）
+  const now = new Date();
+  const timeRemaining = expiryDate - now;
+  
+  // 如果倒计时已结束，但帖子仍然存在(服务器还没有删除)
+  // 显示负数倒计时，而不是"已过期"
+  if (timeRemaining <= 0) {
+    // 计算超时的时间
+    const overdue = Math.abs(timeRemaining);
+    const days = Math.floor(overdue / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((overdue % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((overdue % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((overdue % (1000 * 60)) / 1000);
+    const milliseconds = Math.floor(overdue % 1000);
+    
+    // 格式化超时时间精确到秒
+    let text = '-';
+    // 四舍五入到最接近的秒
+    const roundedSeconds = Math.round(seconds + milliseconds / 1000);
+    // 格式化为整数秒
+    const formattedSeconds = roundedSeconds.toString();
+    
+    if (days > 0) {
+      text += `${days}天${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${formattedSeconds.padStart(2, '0')}`;
+    } else if (hours > 0) {
+      text += `${hours}:${minutes.toString().padStart(2, '0')}:${formattedSeconds.padStart(2, '0')}`;
+    } else if (minutes > 0) {
+      text += `${minutes}:${formattedSeconds.padStart(2, '0')}`;
+    } else {
+      text += `${formattedSeconds}`;
+    }
+    
+    return {
+      text: text,
+      expired: true,
+      timeRemaining: timeRemaining,
+      status: 'urgent' // 使用紧急样式
+    };
+  }
+  
+  // 计算天、小时、分钟、秒和毫秒
+  const days = Math.floor(timeRemaining / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
+  const milliseconds = Math.floor(timeRemaining % 1000);
+  
+  // 根据剩余时间确定显示格式和状态
+  let status = '';
+  if (days === 0 && hours < 12) {
+    status = 'urgent';
+  } else if (days < 1) {
+    status = 'expiring';
+  }
+  
+  // 格式化显示文本精确到秒
+  let text = '';
+  // 四舍五入到最接近的秒
+  const roundedSeconds = Math.round(seconds + milliseconds / 1000);
+  // 格式化为整数秒
+  const formattedSeconds = roundedSeconds.toString();
+  
+  if (days > 0) {
+    text = `${days}天${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${formattedSeconds.padStart(2, '0')}`;
+  } else if (hours > 0) {
+    text = `${hours}:${minutes.toString().padStart(2, '0')}:${formattedSeconds.padStart(2, '0')}`;
+  } else if (minutes > 0) {
+    text = `${minutes}:${formattedSeconds.padStart(2, '0')}`;
+  } else {
+    text = `${formattedSeconds}`;
+  }
+  
+  return {
+    text: text,
+    expired: false,
+    timeRemaining: timeRemaining,
+    status: status
+  };
+}
+
+// 更新所有倒计时标签
+function updateAllCountdowns() {
+  const countdownElements = document.querySelectorAll('.countdown-tag');
+  
+  countdownElements.forEach(element => {
+    const createdAt = element.getAttribute('data-created-at');
+    const deleteAt = element.getAttribute('data-delete-at');
+    if (!createdAt) return;
+    
+    const countdown = calculateCountdown(createdAt, deleteAt);
+    
+    // 更新显示文本
+    element.textContent = countdown.text;
+    
+    // 更新样式
+    element.classList.remove('expiring', 'urgent');
+    if (countdown.status) {
+      element.classList.add(countdown.status);
+    }
+  });
+}
+
+// 启动倒计时定时器
+let countdownInterval = null;
+
+function startCountdownTimer() {
+  // 清除可能存在的旧定时器
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+  }
+  
+  // 初始更新一次
+  updateAllCountdowns();
+  
+  // 设置定时器，每100毫秒更新一次（以保证0.1秒的精度）
+  countdownInterval = setInterval(updateAllCountdowns, 100);
 }

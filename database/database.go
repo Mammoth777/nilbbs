@@ -38,13 +38,14 @@ func InitDB() error {
 
 	// 不再删除表，只在表不存在时创建它们
 
-	// 创建帖子表 - 不包含标题字段
+	// 创建帖子表 - 不包含标题字段，添加delete_at字段记录预计删除时间
 	_, err = DB.Exec(`
 	CREATE TABLE IF NOT EXISTS posts (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		content TEXT NOT NULL,
 		author TEXT NOT NULL,
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		delete_at TIMESTAMP
 	)`)
 	if err != nil {
 		return err
@@ -75,10 +76,11 @@ func CloseDB() {
 	}
 }
 
-// 删除N天不活跃的帖子(创建超过N天且N天没有新评论的帖子)
+// 删除已过期的帖子（当前时间已经超过帖子的delete_at时间）
 func DeleteOldPosts(days int) (int64, error) {
-	// 计算截止日期
-	cutoffDate := time.Now().AddDate(0, 0, -days)
+	// 获取当前时间
+	currentTime := time.Now()
+	currentTimeStr := currentTime.Format("2006-01-02 15:04:05")
 	
 	// 开始事务
 	tx, err := DB.Begin()
@@ -87,16 +89,12 @@ func DeleteOldPosts(days int) (int64, error) {
 	}
 	defer tx.Rollback()
 
-	// 查找不活跃的帖子ID：
-	// 1. 帖子创建时间超过N天
-	// 2. 且没有N天内的评论
+	// 查找已过期的帖子ID：
+	// 当前时间已经超过帖子的delete_at时间
 	rows, err := tx.Query(`
 		SELECT p.id FROM posts p 
-		WHERE p.created_at < ? 
-		AND NOT EXISTS (
-			SELECT 1 FROM comments c 
-			WHERE c.post_id = p.id AND c.created_at >= ?
-		)`, cutoffDate, cutoffDate)
+		WHERE p.delete_at < ?
+		`, currentTimeStr)
 	
 	if err != nil {
 		return 0, err
@@ -149,3 +147,74 @@ func DeleteOldPosts(days int) (int64, error) {
 	// 返回删除的帖子数量
 	return result.RowsAffected()
 }
+
+// 更新帖子的删除时间（基于最新评论或创建时间）
+func UpdatePostDeleteTime(postID int64, daysToKeep int) error {
+	// 开始事务
+	tx, err := DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 查找该帖子的最新评论时间
+	var latestActivityTime time.Time
+	var latestCommentTimeStr string
+	err = tx.QueryRow(`
+		SELECT MAX(created_at) 
+		FROM comments 
+		WHERE post_id = ?
+	`, postID).Scan(&latestCommentTimeStr)
+
+	// 如果没有评论或查询出错，使用帖子的创建时间
+	if err != nil || latestCommentTimeStr == "" {
+		var createdAtStr string
+		err = tx.QueryRow(`
+			SELECT created_at 
+			FROM posts 
+			WHERE id = ?
+		`, postID).Scan(&createdAtStr)
+		
+		if err != nil {
+			return err
+		}
+		
+		var parseErr error
+		latestActivityTime, parseErr = time.Parse("2006-01-02 15:04:05", createdAtStr)
+		if parseErr != nil {
+			latestActivityTime, parseErr = time.Parse(time.RFC3339, createdAtStr)
+			if parseErr != nil {
+				return parseErr
+			}
+		}
+	} else {
+		// 解析最新评论时间
+		var parseErr error
+		latestActivityTime, parseErr = time.Parse("2006-01-02 15:04:05", latestCommentTimeStr)
+		if parseErr != nil {
+			latestActivityTime, parseErr = time.Parse(time.RFC3339, latestCommentTimeStr)
+			if parseErr != nil {
+				return parseErr
+			}
+		}
+	}
+	
+	// 计算新的删除时间（最新活动时间 + daysToKeep天）
+	newDeleteTime := latestActivityTime.AddDate(0, 0, daysToKeep)
+	newDeleteTimeStr := newDeleteTime.Format("2006-01-02 15:04:05")
+	
+	// 更新帖子的delete_at字段
+	_, err = tx.Exec(`
+		UPDATE posts 
+		SET delete_at = ? 
+		WHERE id = ?
+	`, newDeleteTimeStr, postID)
+	
+	if err != nil {
+		return err
+	}
+	
+	// 提交事务
+	return tx.Commit()
+}
+
