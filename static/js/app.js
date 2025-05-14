@@ -77,6 +77,18 @@ function loadPostView(postId) {
     // 已经在帖子详情页了，只需刷新数据
     loadPost(postId);
     setupCommentEvents(postId);
+    
+    // 向父窗口发送消息（如果存在）
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({
+        type: 'nilbbs_navigation',
+        data: {
+          route: 'post',
+          postId: postId,
+          url: window.location.href
+        }
+      }, '*');
+    }
   } else {
     // 需要获取帖子详情页模板
     fetch(`/post/${postId}`)
@@ -94,6 +106,18 @@ function loadPostView(postId) {
         // 重新初始化昵称显示
         initNickname();
         displayNickname();
+        
+        // 向父窗口发送消息（如果存在）
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({
+            type: 'nilbbs_navigation',
+            data: {
+              route: 'post',
+              postId: postId,
+              url: window.location.href
+            }
+          }, '*');
+        }
       });
   }
 }
