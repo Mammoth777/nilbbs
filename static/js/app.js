@@ -1,10 +1,10 @@
 // Page initialization after DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-  // Initialize based on current page or URL hash
+  // Initialize based on current page or URL query parameters
   initializePageByRoute();
   
-  // 监听 hashchange 事件以处理路由变化
-  window.addEventListener('hashchange', function() {
+  // 监听 popstate 事件以处理路由变化
+  window.addEventListener('popstate', function() {
     initializePageByRoute();
   });
   
@@ -15,21 +15,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 初始化页面基于当前路由
 function initializePageByRoute() {
-  // 首先检查 hash 路由
-  const hash = window.location.hash;
+  // 从 URL 查询参数获取 postId
+  const urlParams = new URLSearchParams(window.location.search);
+  const postId = urlParams.get('postId');
   
-  if (hash.startsWith('#/post/')) {
-    const postId = hash.split('/').pop();
+  if (postId) {
+    // 如果有 postId 参数，加载帖子详情视图
     loadPostView(postId);
   } else {
-    // 如果没有 hash 或不匹配已知格式，检查当前路径
+    // 检查当前路径
     const path = window.location.pathname;
     
     if (path.startsWith('/post/')) {
-      const postId = path.split('/').pop();
-      // 将常规路由转换为 hash 路由
-      window.location.hash = `/post/${postId}`;
-      return; // 会触发 hashchange 事件，不需要继续执行
+      const pathPostId = path.split('/').pop();
+      // 将常规路由转换为查询参数路由
+      window.location.href = `/?postId=${pathPostId}`;
+      return;
     }
     
     // 默认加载主页
@@ -66,6 +67,11 @@ function loadHomeView() {
         displayNickname();
       });
   }
+  
+  // 如果 URL 中有查询参数，但我们正在查看主页，清除这些参数
+  if (window.location.search && history.pushState) {
+    history.pushState({}, '', '/');
+  }
 }
 
 // 加载帖子详情视图
@@ -96,12 +102,26 @@ function loadPostView(postId) {
         displayNickname();
       });
   }
+  
+  // 确保 URL 查询参数与当前帖子 ID 一致
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlPostId = urlParams.get('postId');
+  
+  if (urlPostId !== postId && history.pushState) {
+    // 更新 URL，但不触发页面重新加载
+    history.pushState({ postId: postId }, '', `/?postId=${postId}`);
+  }
 }
 
 // 帖子导航函数
 function navigateToPost(event, postId) {
   event.preventDefault();
-  window.location.hash = `/post/${postId}`;
+  // 使用 history API 添加状态并更改 URL
+  const newUrl = `/?postId=${postId}`;
+  history.pushState({ postId: postId }, '', newUrl);
+  
+  // 加载帖子详情视图
+  loadPostView(postId);
 }
 
 // 设置快速发帖事件
@@ -243,7 +263,7 @@ async function loadPosts() {
         
         postList.innerHTML += `
           <li class="post-item">
-            <div class="post-content"><a href="#" data-post-id="${post.id}" onclick="navigateToPost(event, ${post.id})">${preview}</a></div>
+            <div class="post-content"><a href="/?postId=${post.id}" data-post-id="${post.id}" onclick="navigateToPost(event, ${post.id})">${preview}</a></div>
             <div class="post-meta">${post.author} · ${date}</div>
           </li>
         `;
@@ -305,7 +325,7 @@ async function loadPost(postId) {
     postContainer.innerHTML = `
       <div class="error-message" style="text-align:center; padding: 20px;">
         <p>帖子不存在或已被删除</p>
-        <p><a href="#" onclick="window.location.hash = ''; return false;">返回主页</a></p>
+        <p><a href="/" onclick="event.preventDefault(); history.pushState({}, '', '/'); loadHomeView(); return false;">返回主页</a></p>
       </div>
     `;
     commentsContainer.innerHTML = ''; // 清空评论区
@@ -371,8 +391,9 @@ async function createPost(event) {
     
     if (!response.ok) throw new Error('Failed to create post');
     
-    // 使用 hash 路由导航到主页
-    window.location.hash = '';
+    // 使用查询参数路由导航到主页
+    history.pushState({}, '', '/');
+    loadHomeView();
   } catch (error) {
     showError('Failed to create post');
   }

@@ -12,9 +12,9 @@
   <nav class="navbar">
     <div class="container">
       <h1 class="navbar-brand">
-        <a href="#" onclick="window.location.hash = ''; return false;">
+        <a href="/" onclick="event.preventDefault(); history.pushState({}, '', '/'); loadHomeView(); return false;">
           nilbbs
-          <span class="tip">Click, back to list</span>
+          <span class="tip">点击返回列表</span>
         </a>
       </h1>
       <div id="nickname-container" class="nickname-container">
