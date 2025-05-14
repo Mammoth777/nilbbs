@@ -1,40 +1,135 @@
 // Page initialization after DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-  // Initialize based on current page
-  const path = window.location.pathname;
-  if (path === '/' || path === '/index.html') {
-    loadPosts();
-    // Add keyboard event for quick posting
-    const quickPostContent = document.getElementById('quick-post-content');
-    if (quickPostContent) {
-      quickPostContent.addEventListener('keydown', function(e) {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-          quickCreatePost(e);
-        }
-      });
-    }
-  } else if (path.startsWith('/post/')) {
-    const postId = path.split('/').pop();
-    loadPost(postId);
-    // Add keyboard event for comments
-    const commentContent = document.getElementById('comment-content');
-    if (commentContent) {
-      commentContent.addEventListener('keydown', function(e) {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-          const form = document.getElementById('comment-form');
-          if (form) {
-            const event = new Event('submit', { cancelable: true });
-            form.dispatchEvent(event);
-          }
-        }
-      });
-    }
-  }
+  // Initialize based on current page or URL hash
+  initializePageByRoute();
   
-  // Ensure nickname exists in SessionStorage and display it
+  // 监听 hashchange 事件以处理路由变化
+  window.addEventListener('hashchange', function() {
+    initializePageByRoute();
+  });
+  
+  // 确保昵称存在并显示
   initNickname();
   displayNickname();
 });
+
+// 初始化页面基于当前路由
+function initializePageByRoute() {
+  // 首先检查 hash 路由
+  const hash = window.location.hash;
+  
+  if (hash.startsWith('#/post/')) {
+    const postId = hash.split('/').pop();
+    loadPostView(postId);
+  } else {
+    // 如果没有 hash 或不匹配已知格式，检查当前路径
+    const path = window.location.pathname;
+    
+    if (path.startsWith('/post/')) {
+      const postId = path.split('/').pop();
+      // 将常规路由转换为 hash 路由
+      window.location.hash = `/post/${postId}`;
+      return; // 会触发 hashchange 事件，不需要继续执行
+    }
+    
+    // 默认加载主页
+    loadHomeView();
+  }
+}
+
+// 加载主页视图
+function loadHomeView() {
+  // 确保显示正确的视图
+  document.title = 'NilBBS - Minimalist Anonymous Forum';
+  
+  // 检查是否需要获取页面模板
+  if (document.getElementById('post-list')) {
+    // 已经在主页了，只需刷新数据
+    loadPosts();
+    setupQuickPostEvents();
+  } else {
+    // 需要获取主页模板
+    fetch('/')
+      .then(response => response.text())
+      .then(html => {
+        // 提取 body 内容
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        document.body.innerHTML = doc.body.innerHTML;
+        
+        // 加载数据并设置事件
+        loadPosts();
+        setupQuickPostEvents();
+        
+        // 重新初始化昵称显示
+        initNickname();
+        displayNickname();
+      });
+  }
+}
+
+// 加载帖子详情视图
+function loadPostView(postId) {
+  document.title = 'Detail - NilBBS';
+  
+  // 检查是否需要获取页面模板
+  if (document.getElementById('post-container') && document.getElementById('comments-container')) {
+    // 已经在帖子详情页了，只需刷新数据
+    loadPost(postId);
+    setupCommentEvents(postId);
+  } else {
+    // 需要获取帖子详情页模板
+    fetch(`/post/${postId}`)
+      .then(response => response.text())
+      .then(html => {
+        // 提取 body 内容
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        document.body.innerHTML = doc.body.innerHTML;
+        
+        // 加载数据并设置事件
+        loadPost(postId);
+        setupCommentEvents(postId);
+        
+        // 重新初始化昵称显示
+        initNickname();
+        displayNickname();
+      });
+  }
+}
+
+// 帖子导航函数
+function navigateToPost(event, postId) {
+  event.preventDefault();
+  window.location.hash = `/post/${postId}`;
+}
+
+// 设置快速发帖事件
+function setupQuickPostEvents() {
+  const quickPostContent = document.getElementById('quick-post-content');
+  if (quickPostContent) {
+    quickPostContent.addEventListener('keydown', function(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        quickCreatePost(e);
+      }
+    });
+  }
+}
+
+// 设置评论事件
+function setupCommentEvents(postId) {
+  const commentContent = document.getElementById('comment-content');
+  if (commentContent) {
+    commentContent.addEventListener('keydown', function(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        const form = document.getElementById('comment-form');
+        if (form) {
+          addComment(new Event('submit', { cancelable: true }), postId);
+        }
+      }
+    });
+  }
+}
 
 function formatDate(dateString) {
   const d = new Date(dateString);
@@ -148,7 +243,7 @@ async function loadPosts() {
         
         postList.innerHTML += `
           <li class="post-item">
-            <div class="post-content"><a href="/post/${post.id}">${preview}</a></div>
+            <div class="post-content"><a href="#" data-post-id="${post.id}" onclick="navigateToPost(event, ${post.id})">${preview}</a></div>
             <div class="post-meta">${post.author} · ${date}</div>
           </li>
         `;
@@ -166,6 +261,7 @@ async function loadPosts() {
 async function loadPost(postId) {
   const postContainer = document.getElementById('post-container');
   const commentsContainer = document.getElementById('comments-container');
+  const commentForm = document.querySelector('.comment-form');
   if (!postContainer || !commentsContainer) return;
   
   try {
@@ -198,9 +294,26 @@ async function loadPost(postId) {
     } else {
       commentsContainer.innerHTML += '';
     }
+    
+    // 帖子存在时显示评论表单
+    if (commentForm) {
+      commentForm.style.display = 'block';
+    }
   } catch (error) {
     console.error('Loading failed:', error);
-    postContainer.innerHTML = '<p>Failed to load</p>';
+    // 当帖子不存在时，显示友好的错误信息
+    postContainer.innerHTML = `
+      <div class="error-message" style="text-align:center; padding: 20px;">
+        <p>帖子不存在或已被删除</p>
+        <p><a href="#" onclick="window.location.hash = ''; return false;">返回主页</a></p>
+      </div>
+    `;
+    commentsContainer.innerHTML = ''; // 清空评论区
+    
+    // 隐藏评论表单
+    if (commentForm) {
+      commentForm.style.display = 'none';
+    }
   }
 }
 
@@ -225,7 +338,12 @@ async function addComment(event, postId) {
     });
     
     if (!response.ok) throw new Error('Failed to add comment');
-    window.location.reload();
+    
+    // 清空输入框
+    document.getElementById('comment-content').value = '';
+    
+    // 重新加载帖子及评论，不刷新页面
+    loadPost(postId);
   } catch (error) {
     alert('Failed to add comment');
   }
@@ -252,7 +370,9 @@ async function createPost(event) {
     });
     
     if (!response.ok) throw new Error('Failed to create post');
-    window.location.href = '/';
+    
+    // 使用 hash 路由导航到主页
+    window.location.hash = '';
   } catch (error) {
     showError('Failed to create post');
   }
